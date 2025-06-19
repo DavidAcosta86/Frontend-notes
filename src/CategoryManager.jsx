@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from "react";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
+
 function CategoryManager({ onClose, onCategoriesChanged }) {
   const [categories, setCategories] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:8080/api/categories")
+    fetch(`${API_URL}/api/categories`)
       .then((res) => res.json())
       .then((data) => setCategories(data));
   }, []);
 
   const handleAdd = (e) => {
     e.preventDefault();
-    fetch("http://localhost:8080/api/categories", {
+    fetch(`${API_URL}/api/categories`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newCategoryName }),
@@ -30,7 +32,7 @@ function CategoryManager({ onClose, onCategoriesChanged }) {
       "Are you sure you want to delete this category? IT WILL DELETE ALL NOTES WITH THIS CATEGORY!"
     );
     if (!confirmDelete) return;
-    fetch(`http://localhost:8080/api/categories/${id}`, { method: "DELETE" })
+    fetch(`${API_URL}/api/categories/${id}`, { method: "DELETE" })
       .then(() => {
         setCategories(categories.filter((c) => c.id !== id));
         if (onCategoriesChanged) onCategoriesChanged();

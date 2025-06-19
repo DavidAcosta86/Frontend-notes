@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import "./App.css";
 import CategoryManager from "./CategoryManager";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
+
 function App() {
   const [filter, setFilter] = useState("active");
   const [notes, setNotes] = useState([]);
@@ -19,7 +21,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState("");
 
   useEffect(() => {
-    let url = "http://localhost:8080/api/notes";
+    let url = `${API_URL}/api/notes`;
     if (filter === "archived") {
       url += "/archived";
     } else if (filter === "all") {
@@ -43,7 +45,7 @@ function App() {
   }, [filter]);
 
   const fetchCategories = () => {
-    fetch("http://localhost:8080/api/categories")
+    fetch(`${API_URL}/api/categories`)
       .then((res) => res.json())
       .then((data) => setCategories(data));
   };
@@ -58,8 +60,7 @@ function App() {
     const newNote = { title, content, categoryIds: selectedCategoryIds };
 
     if (editingNoteId !== null) {
-      // we are editing an existing note
-      fetch(`http://localhost:8080/api/notes/${editingNoteId}`, {
+      fetch(`${API_URL}/api/notes/${editingNoteId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -78,12 +79,11 @@ function App() {
           );
           setTitle("");
           setContent("");
-          setEditingNoteId(null); // exit edit mode
+          setEditingNoteId(null);
         })
         .catch((err) => alert(err.message));
     } else {
-      // Creatging a new note
-      fetch("http://localhost:8080/api/notes", {
+      fetch(`${API_URL}/api/notes`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -105,7 +105,7 @@ function App() {
   };
 
   const toggleArchive = (id) => {
-    fetch(`http://localhost:8080/api/notes/${id}/archive`, {
+    fetch(`${API_URL}/api/notes/${id}/archive`, {
       method: "PATCH",
     })
       .then((res) => {
@@ -113,7 +113,6 @@ function App() {
         return res.json();
       })
       .then((updatedNote) => {
-        // 🧠 Si la nota archivada ya no cumple con el filtro actual, la sacamos del array
         setNotes((prevNotes) => {
           if (
             (filter === "active" && updatedNote.archived) ||
@@ -135,14 +134,14 @@ function App() {
       "Are you sure you want to delete this note?"
     );
     if (!confirmDelete) return;
-    fetch(`http://localhost:8080/api/notes/${id}`, {
+    fetch(`${API_URL}/api/notes/${id}`, {
       method: "DELETE",
     })
       .then((response) => {
         if (!response.ok) {
           throw new Error("Error when deleting note");
         }
-        setNotes(notes.filter((note) => note.id !== id)); //actulize list of notes after deletion
+        setNotes(notes.filter((note) => note.id !== id));
       })
       .catch((error) => {
         alert(error.message);
@@ -150,9 +149,9 @@ function App() {
   }
 
   useEffect(() => {
-    let url = "http://localhost:8080/api/notes";
+    let url = `${API_URL}/api/notes`;
     if (selectedCategory) {
-      url = `http://localhost:8080/api/notes/by-category/${selectedCategory}`;
+      url = `${API_URL}/api/notes/by-category/${selectedCategory}`;
     }
     fetch(url)
       .then((res) => res.json())
@@ -170,7 +169,7 @@ function App() {
           fetchCategories();
           setLoading(true);
           setError(null);
-          let url = "http://localhost:8080/api/notes";
+          let url = `${API_URL}/api/notes`;
           if (filter === "archived") {
             url += "/archived";
           } else if (filter === "all") {
@@ -225,19 +224,19 @@ function App() {
           Category Manager
         </button>
         <div>
-        <label>Filter by category: </label>
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-        >
-          <option value="">All</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          <label>Filter by category: </label>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
+            <option value="">All</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {notes.length === 0 ? (
@@ -325,13 +324,12 @@ function App() {
           </div>
         </div>
         <br />
-        <div style={{ textAlign:"right"}}>
-        <button  type="submit">
-          {editingNoteId ? "Save Changes" : "Add new note"}
-        </button>
+        <div style={{ textAlign: "right" }}>
+          <button type="submit">
+            {editingNoteId ? "Save Changes" : "Add new note"}
+          </button>
         </div>
       </form>
-      
     </div>
   );
 }
