@@ -20,6 +20,7 @@ function App() {
   const [showCategories, setShowCategories] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
 
+  // Fetch notes on filter change
   useEffect(() => {
     let url = `${API_URL}/api/notes`;
     if (filter === "archived") {
@@ -27,15 +28,19 @@ function App() {
     } else if (filter === "all") {
       url += "/all";
     }
+    setLoading(true);
     fetch(url)
       .then((response) => {
-        if (!response.ok) {
-          throw new Error("Error fetching notes");
-        }
+        if (!response.ok) throw new Error("Error fetching notes");
         return response.json();
       })
       .then((data) => {
-        setNotes(Array.isArray(data) ? data : []);
+        if (!Array.isArray(data)) {
+          console.warn("Expected notes array but got:", data);
+          setNotes([]);
+        } else {
+          setNotes(data);
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -44,12 +49,25 @@ function App() {
       });
   }, [filter]);
 
+  // Fetch categories function reusable
   const fetchCategories = () => {
     fetch(`${API_URL}/api/categories`)
       .then((res) => res.json())
-      .then((data) => setCategories(data));
+      .then((data) => {
+        if (!Array.isArray(data)) {
+          console.warn("Expected categories array but got:", data);
+          setCategories([]);
+        } else {
+          setCategories(data);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching categories:", err);
+        setCategories([]);
+      });
   };
 
+  // Fetch categories on mount
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -62,9 +80,7 @@ function App() {
     if (editingNoteId !== null) {
       fetch(`${API_URL}/api/notes/${editingNoteId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newNote),
       })
         .then((response) => {
@@ -72,22 +88,21 @@ function App() {
           return response.json();
         })
         .then((updatedNote) => {
-          setNotes(
-            notes.map((note) =>
+          setNotes((prevNotes) =>
+            prevNotes.map((note) =>
               note.id === editingNoteId ? updatedNote : note
             )
           );
           setTitle("");
           setContent("");
           setEditingNoteId(null);
+          setSelectedCategoryIds([]);
         })
         .catch((err) => alert(err.message));
     } else {
       fetch(`${API_URL}/api/notes`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newNote),
       })
         .then((response) => {
@@ -95,7 +110,7 @@ function App() {
           return response.json();
         })
         .then((createdNote) => {
-          setNotes([...notes, createdNote]);
+          setNotes((prevNotes) => [...prevNotes, createdNote]);
           setTitle("");
           setContent("");
           setSelectedCategoryIds([]);
@@ -105,9 +120,7 @@ function App() {
   };
 
   const toggleArchive = (id) => {
-    fetch(`${API_URL}/api/notes/${id}/archive`, {
-      method: "PATCH",
-    })
+    fetch(`${API_URL}/api/notes/${id}/archive`, { method: "PATCH" })
       .then((res) => {
         if (!res.ok) throw new Error("Error changing archive status");
         return res.json();
@@ -129,33 +142,42 @@ function App() {
       .catch((err) => alert(err.message));
   };
 
-  function deleteNote(id) {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this note?"
-    );
-    if (!confirmDelete) return;
-    fetch(`${API_URL}/api/notes/${id}`, {
-      method: "DELETE",
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Error when deleting note");
-        }
-        setNotes(notes.filter((note) => note.id !== id));
-      })
-      .catch((error) => {
-        alert(error.message);
-      });
-  }
+  const deleteNote = (id) => {
+    if (!window.confirm("Are you sure you want to delete this note?")) return;
 
+    fetch(`${API_URL}/api/notes/${id}`, { method: "DELETE" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Error when deleting note");
+        setNotes((prevNotes) => prevNotes.filter((note) => note.id !== id));
+      })
+      .catch((error) => alert(error.message));
+  };
+
+  // Fetch notes by selected category
   useEffect(() => {
     let url = `${API_URL}/api/notes`;
     if (selectedCategory) {
       url = `${API_URL}/api/notes/by-category/${selectedCategory}`;
     }
+    setLoading(true);
     fetch(url)
-      .then((res) => res.json())
-      .then((data) => setNotes(data));
+      .then((res) => {
+        if (!res.ok) throw new Error("Error fetching notes by category");
+        return res.json();
+      })
+      .then((data) => {
+        if (!Array.isArray(data)) {
+          console.warn("Expected notes array but got:", data);
+          setNotes([]);
+        } else {
+          setNotes(data);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+      });
   }, [selectedCategory]);
 
   if (loading) return <p>Loading notes...</p>;
@@ -177,13 +199,16 @@ function App() {
           }
           fetch(url)
             .then((response) => {
-              if (!response.ok) {
-                throw new Error("Error fetching notes");
-              }
+              if (!response.ok) throw new Error("Error fetching notes");
               return response.json();
             })
             .then((data) => {
-              setNotes(data);
+              if (!Array.isArray(data)) {
+                console.warn("Expected notes array but got:", data);
+                setNotes([]);
+              } else {
+                setNotes(data);
+              }
               setLoading(false);
             })
             .catch((err) => {
@@ -230,11 +255,12 @@ function App() {
             onChange={(e) => setSelectedCategory(e.target.value)}
           >
             <option value="">All</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
+            {Array.isArray(categories) &&
+              categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
           </select>
         </div>
       </div>
@@ -255,7 +281,8 @@ function App() {
                         Categories:{" "}
                         {note.categoryIds
                           .map(
-                            (id) => categories.find((cat) => cat.id === id)?.name
+                            (id) =>
+                              categories.find((cat) => cat.id === id)?.name
                           )
                           .filter(Boolean)
                           .join(", ")}
@@ -297,30 +324,31 @@ function App() {
           value={content}
           onChange={(e) => setContent(e.target.value)}
           required
-        ></textarea>
+        />
         <br />
         <div>
           <label>Categories:</label>
           <div style={{ display: "flex", gap: "1em", flexWrap: "wrap" }}>
-            {categories.map((cat) => (
-              <label key={cat.id} style={{ fontWeight: "normal" }}>
-                <input
-                  type="checkbox"
-                  value={cat.id}
-                  checked={selectedCategoryIds.includes(cat.id)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedCategoryIds([...selectedCategoryIds, cat.id]);
-                    } else {
-                      setSelectedCategoryIds(
-                        selectedCategoryIds.filter((id) => id !== cat.id)
-                      );
-                    }
-                  }}
-                />
-                {cat.name}
-              </label>
-            ))}
+            {Array.isArray(categories) &&
+              categories.map((cat) => (
+                <label key={cat.id} style={{ fontWeight: "normal" }}>
+                  <input
+                    type="checkbox"
+                    value={cat.id}
+                    checked={selectedCategoryIds.includes(cat.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCategoryIds([...selectedCategoryIds, cat.id]);
+                      } else {
+                        setSelectedCategoryIds(
+                          selectedCategoryIds.filter((id) => id !== cat.id)
+                        );
+                      }
+                    }}
+                  />
+                  {cat.name}
+                </label>
+              ))}
           </div>
         </div>
         <br />
